@@ -1,0 +1,20 @@
+{
+  "rows": 9648,
+  "sales_reported": 899902125.0,
+  "sales_recomputed": 120166650.0,
+  "profit_reported": 332134761.45,
+  "profit_recomputed": 47224967.7,
+  "share_rows_x10": 0.4027777777777778,
+  "channel_share_reported": {
+    "In-store": 0.3963,
+    "Online": 0.2752,
+    "Outlet": 0.3285
+  },
+  "channel_share_recomputed": {
+    "In-store": 0.2968,
+    "Online": 0.3742,
+    "Outlet": 0.329
+  },
+  "growth_all_rows": 2.9579171793917025,
+  "growth_like_for_like": 2.804958928828767
+}

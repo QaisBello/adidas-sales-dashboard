@@ -1,0 +1,11 @@
+check,rows_affected,finding,action
+Load,9648,"9,648 invoice lines, 13 columns, Jan 2020 to Dec 2021. Header sits on row 5 of the sheet.",Read with header offset; dropped empty spacer columns.
+Missing values,0,No blanks in any column.,None needed.
+Total sales = price x units,3886,40% of rows report total sales exactly 10x price x units. Every other row matches to the cent. All 1740 in-store rows are affected.,Kept the reported figure and added a recomputed one (price x units). The dashboard shows both.
+Operating profit = sales x margin,0,"Profit always equals reported sales x margin, so the 10x rows have 10x profit too.",Recomputed profit = recomputed sales x operating margin.
+"Same retailer, day, city, product and channel",3372,"1,686 pairs share every descriptive field. 1,670 of them pair one 10x row with one normal row, which suggests two sources merged at different scales.","Kept both rows and flagged them; they differ in price and units, so they are not exact duplicates."
+Zero units sold,4,Lines with 0 units and $0 sales.,Kept (they don't move totals); flagged.
+Retailer ID,9288,3 IDs are shared by more than one retailer (ID 1185732 is used by 6 different retailers).,Dropped retailer_id; use the retailer name.
+City names,648,"Charleston, Portland exist in two states each.",Added city_state for unambiguous grouping.
+Year-on-year coverage,1302,"2020 has 1,302 rows from 9 cities; 2021 has 8,346 rows from 47 cities, so a raw year-on-year comparison mixes real growth with new cities entering the data.",Added a like-for-like flag (city + retailer pairs present in both years) so growth can be compared fairly.
+Like-for-like growth,408,Only 2 city-retailer pairs appear in both years (408 rows). That is too few to separate real growth from new cities entering the data.,Treat 2020-vs-2021 growth as unreliable. The dashboard labels it as such instead of headlining it.

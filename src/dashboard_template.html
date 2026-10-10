@@ -1,0 +1,446 @@
+<title>The 10× Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+/* Layout: a forensic audit report. One ledger switch at the top drives every figure; the channel "flip" is the thesis; evidence panels follow on a ruled-paper grid. */
+:root{
+  --paper:#f6f6f3; --sheet:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781; --rule:#e1e0d9; --axis:#c3c2b7;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --seq-0:#eef4fc; --seq-1:#cde2fb; --seq-2:#9ec5f4; --seq-3:#5598e7; --seq-4:#256abf; --seq-5:#104281;
+  --flag:#fab219; --flag-ink:#8a5a00; --crit:#d03b3b;
+  --font:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --paper:#0d0d0d; --sheet:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781; --rule:#2c2c2a; --axis:#383835;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --seq-0:#1d2430; --seq-1:#184f95; --seq-2:#1c5cab; --seq-3:#2a78d6; --seq-4:#5598e7; --seq-5:#9ec5f4;
+  --flag-ink:#fab219; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --paper:#0d0d0d; --sheet:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#898781; --rule:#2c2c2a; --axis:#383835;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --seq-0:#1d2430; --seq-1:#184f95; --seq-2:#1c5cab; --seq-3:#2a78d6; --seq-4:#5598e7; --seq-5:#9ec5f4;
+  --flag-ink:#fab219; color-scheme:dark; }
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;margin:0}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:clamp(16px,3vw,32px);padding-block:28px 56px;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3,p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.head{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px 40px;align-items:end;padding-bottom:18px;border-bottom:2px solid var(--ink)}
+.head h1{font-weight:800;font-stretch:72%;font-size:clamp(48px,8vw,104px);line-height:.88;letter-spacing:-.01em;text-transform:uppercase;margin-top:10px}
+.head h1 .x{font-stretch:125%;background:var(--flag);color:#0b0b0b;padding:0 .08em;margin-right:.04em}
+.lede{color:var(--ink-2);font-size:16px;max-width:58ch;margin-top:14px}
+.lede b{color:var(--ink)}
+.src{font-family:var(--mono);font-size:11px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.src a{color:var(--ink)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.dot.live{background:#0ca30c}
+
+/* ledger switch */
+.ledger{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.switch{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--ink);border-radius:10px;overflow:hidden}
+.switch button{all:unset;cursor:pointer;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.switch button+button{border-left:1.5px solid var(--ink)}
+.switch button .t{font-weight:700;font-size:15px;font-stretch:90%}
+.switch button .v{font-family:var(--mono);font-size:22px;font-weight:500}
+.switch button .d{font-size:12px;color:var(--ink-2)}
+.switch button[aria-pressed="true"]{background:var(--ink);color:var(--sheet)}
+.switch button[aria-pressed="true"] .d{color:color-mix(in srgb,var(--sheet) 75%,transparent)}
+.switch button:focus-visible{outline:3px solid var(--s1);outline-offset:-3px}
+.ledger .note{font-size:12.5px;color:var(--ink-2);display:flex;gap:8px;align-items:flex-start}
+.flagicon{display:inline-grid;place-items:center;min-width:28px;height:18px;padding:0 4px;border-radius:4px;background:var(--flag);color:#0b0b0b;font-family:var(--mono);font-size:10.5px;font-weight:600;flex:none}
+
+/* filters */
+.filters{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--paper) 90%,transparent);backdrop-filter:blur(8px);padding-block:10px;border-bottom:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.fg{display:flex;align-items:center;gap:6px}
+.fg label{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+select{font:inherit;font-size:13px;padding:6px 28px 6px 10px;border-radius:8px;border:1px solid var(--rule);background:var(--sheet);color:var(--ink);appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 14px) 52%,calc(100% - 9px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+select:focus-visible{outline:2px solid var(--s1);outline-offset:1px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center}
+.chip{all:unset;cursor:pointer;font-family:var(--mono);font-size:11px;padding:4px 9px;border-radius:99px;background:var(--ink);color:var(--sheet)}
+.chip::after{content:" ×"}
+.reset{all:unset;cursor:pointer;font-size:12px;color:var(--ink-2);text-decoration:underline;text-underline-offset:3px}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid var(--rule);border-radius:12px;background:var(--sheet);overflow:hidden}
+.kpi{padding:14px 16px;border-right:1px solid var(--rule);min-width:0}
+.kpi:last-child{border-right:0}
+.kpi .k{font-size:12px;color:var(--ink-2)}
+.kpi .v{font-weight:700;font-stretch:80%;font-size:clamp(28px,3.2vw,40px);line-height:1.05;margin-top:4px}
+.kpi .s{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:4px}
+.kpi .s .flagicon{margin-right:4px}
+
+/* panels */
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.panel{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel h2{font-weight:700;font-stretch:85%;font-size:22px;letter-spacing:-.005em}
+.panel .sub{color:var(--ink-2);font-size:13px;max-width:72ch}
+.s12{grid-column:span 12}.s8{grid-column:span 8}.s7{grid-column:span 7}.s6{grid-column:span 6}.s5{grid-column:span 5}.s4{grid-column:span 4}
+.ph{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.thesis{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:24px;align-items:center}
+.thesis .big{font-weight:800;font-stretch:75%;font-size:clamp(28px,3.6vw,46px);line-height:1;text-transform:uppercase}
+.thesis .big em{font-style:normal;color:var(--s2)}
+.thesis p{color:var(--ink-2);margin-top:12px;max-width:46ch}
+svg{display:block;max-width:100%}
+svg text{fill:var(--ink-2);font-family:var(--font);font-size:11px}
+.axis path,.axis line{stroke:var(--axis)}
+.axis text{fill:var(--muted);font-family:var(--mono);font-size:10px}
+.grid-line line{stroke:var(--rule)}
+.grid-line path{display:none}
+.hit{cursor:pointer}
+.hit:focus{outline:none}
+.hit:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:500}
+td.n{font-family:var(--mono);text-align:right;white-space:nowrap}
+.tip{position:fixed;pointer-events:none;z-index:20;background:var(--ink);color:var(--sheet);font-size:12px;padding:7px 9px;border-radius:6px;max-width:260px;opacity:0;transition:opacity .12s;line-height:1.4}
+.warnband{fill:var(--flag);opacity:.12}
+footer{color:var(--muted);font-size:12px;max-width:95ch}
+footer a{color:var(--ink-2)}
+@media (max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.kpi:nth-child(3){border-right:0}.kpi:nth-child(-n+3){border-bottom:1px solid var(--rule)}}
+@media (max-width:900px){.head,.thesis{grid-template-columns:minmax(0,1fr)}.s8,.s7,.s6,.s5,.s4{grid-column:span 12}}
+@media (max-width:560px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi{border-right:0;border-bottom:1px solid var(--rule)}.chips{margin-left:0}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<!--SITEBAR-->
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="eyebrow">Adidas US sales · 2020–2021 · data audit</div>
+      <h1><span class="x">10×</span>Ledger</h1>
+      <p class="lede">A widely shared sales dataset reports <b id="l-rep">$900M</b> in revenue. Recompute every line as price × units and it comes to <b id="l-rec">$120M</b>. <span id="l-x10">40%</span> of rows are inflated exactly tenfold, and fixing them changes which sales channel wins.</p>
+      <div class="src" id="src"><span class="dot"></span>Loading data…</div>
+    </div>
+    <div class="ledger" aria-label="Choose which numbers to show">
+      <div class="eyebrow">Show figures from</div>
+      <div class="switch" role="group">
+        <button type="button" id="led-rec" data-l="rec" aria-pressed="true"><span class="t">Recomputed</span><span class="v num" id="tot-rec">–</span><span class="d">price × units, line by line</span></button>
+        <button type="button" id="led-rep" data-l="rep" aria-pressed="false"><span class="t">As reported</span><span class="v num" id="tot-rep">–</span><span class="d">the dataset's own total column</span></button>
+      </div>
+      <div class="note"><span class="flagicon">10×</span><span>Every chart below follows this switch. Flip it to see how far the published dashboard drifted.</span></div>
+    </div>
+  </header>
+
+  <nav class="filters" aria-label="Filters">
+    <div class="fg"><label for="f-year">Year</label><select id="f-year"></select></div>
+    <div class="fg"><label for="f-region">Region</label><select id="f-region"></select></div>
+    <div class="fg"><label for="f-retailer">Retailer</label><select id="f-retailer"></select></div>
+    <div class="fg"><label for="f-product">Product</label><select id="f-product"></select></div>
+    <div class="fg"><label for="f-method">Channel</label><select id="f-method"></select></div>
+    <div class="chips" id="chips"></div>
+  </nav>
+
+  <section class="kpis" id="kpis" aria-label="Key figures"></section>
+
+  <section class="grid">
+    <article class="panel s12">
+      <div class="thesis">
+        <div>
+          <div class="eyebrow">01 · The flip</div>
+          <div class="big" style="margin-top:8px">In-store looked biggest.<br><em>It's the smallest.</em></div>
+          <p>Every in-store row carries the 10× error, so the reported totals overstate in-store sales far more than online or outlet. Corrected, online is the largest channel. Share of revenue by channel, before and after:</p>
+        </div>
+        <div id="flip"></div>
+      </div>
+    </article>
+
+    <article class="panel s8">
+      <div class="ph"><div><div class="eyebrow">02 · Trend</div><h2>Monthly revenue</h2></div><div class="legend" id="trend-legend"></div></div>
+      <p class="sub">The shaded year has records from only 9 cities against 47 in 2021, so the jump in January 2021 is mostly new data, not new demand.</p>
+      <div id="trend"></div>
+    </article>
+
+    <article class="panel s4">
+      <div class="eyebrow">03 · Channel</div><h2>Revenue by channel</h2>
+      <p class="sub">Click a bar to filter.</p>
+      <div id="method"></div>
+    </article>
+
+    <article class="panel s7">
+      <div class="ph"><div><div class="eyebrow">04 · Geography</div><h2>Revenue by state</h2></div><div class="legend" id="map-legend"></div></div>
+      <p class="sub">One tile per state, shaded by revenue. Click a state to filter.</p>
+      <div id="map"></div>
+    </article>
+
+    <article class="panel s5">
+      <div class="eyebrow">05 · Retailers</div><h2>Revenue and margin by retailer</h2>
+      <p class="sub">Bar = revenue; label = operating margin. Click to filter.</p>
+      <div id="retailer"></div>
+    </article>
+
+    <article class="panel s7">
+      <div class="eyebrow">06 · Mix</div><h2>Product × region</h2>
+      <p class="sub">Each cell is that product's revenue in that region. Click a cell to filter both.</p>
+      <div id="heat"></div>
+    </article>
+
+    <article class="panel s5">
+      <div class="eyebrow">07 · Evidence</div><h2>Two populations</h2>
+      <p class="sub">Units sold per line. The 10× rows also sell about three times more units, which points to two sources merged at different scales rather than a one-off typo.</p>
+      <div id="pop"></div>
+    </article>
+
+    <article class="panel s12">
+      <div class="ph"><div><div class="eyebrow">08 · Audit trail</div><h2>Every check, logged</h2></div><span class="eyebrow" id="logcount"></span></div>
+      <div class="tablewrap"><table id="log"></table></div>
+    </article>
+  </section>
+
+  <footer>Source: “Adidas Sales Dataset”, a public Kaggle dataset of US invoice lines (2020–2021); its origin isn't verified and it should be treated as illustrative. Recomputed revenue = price per unit × units sold; recomputed profit = recomputed revenue × operating margin. Cleaning, audit and dashboard by Qais Adeniji-Bello.</footer>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const SOURCE = {repo:"QaisBello/adidas-sales-dashboard", branch:"main", dir:"data/cleaned"};
+const FALLBACKS = /*FALLBACKS*/["../data/cleaned/"];
+const RAW = f=>`https://raw.githubusercontent.com/${SOURCE.repo}/${SOURCE.branch}/${SOURCE.dir}/${f}`;
+
+const ABBR={"Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA","Colorado":"CO","Connecticut":"CT","Delaware":"DE","Florida":"FL","Georgia":"GA","Hawaii":"HI","Idaho":"ID","Illinois":"IL","Indiana":"IN","Iowa":"IA","Kansas":"KS","Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD","Massachusetts":"MA","Michigan":"MI","Minnesota":"MN","Mississippi":"MS","Missouri":"MO","Montana":"MT","Nebraska":"NE","Nevada":"NV","New Hampshire":"NH","New Jersey":"NJ","New Mexico":"NM","New York":"NY","North Carolina":"NC","North Dakota":"ND","Ohio":"OH","Oklahoma":"OK","Oregon":"OR","Pennsylvania":"PA","Rhode Island":"RI","South Carolina":"SC","South Dakota":"SD","Tennessee":"TN","Texas":"TX","Utah":"UT","Vermont":"VT","Virginia":"VA","Washington":"WA","West Virginia":"WV","Wisconsin":"WI","Wyoming":"WY"};
+const TILE={AK:[0,0],ME:[10,0],VT:[9,1],NH:[10,1],WA:[0,2],ID:[1,2],MT:[2,2],ND:[3,2],MN:[4,2],IL:[5,2],WI:[6,2],MI:[7,2],NY:[8,2],RI:[9,2],MA:[10,2],
+  OR:[0,3],NV:[1,3],WY:[2,3],SD:[3,3],IA:[4,3],IN:[5,3],OH:[6,3],PA:[7,3],NJ:[8,3],CT:[9,3],CA:[0,4],UT:[1,4],CO:[2,4],NE:[3,4],MO:[4,4],KY:[5,4],WV:[6,4],VA:[7,4],MD:[8,4],DE:[9,4],
+  AZ:[1,5],NM:[2,5],KS:[3,5],AR:[4,5],TN:[5,5],NC:[6,5],SC:[7,5],OK:[3,6],LA:[4,6],MS:[5,6],AL:[6,6],GA:[7,6],HI:[0,7],TX:[3,7],FL:[8,7]};
+const METHODS=["In-store","Online","Outlet"];
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const SC=()=>({"In-store":css("--s1"),"Online":css("--s2"),"Outlet":css("--s3")});
+const money=v=>{const a=Math.abs(v);return a>=1e9?`$${(v/1e9).toFixed(2)}B`:a>=1e6?`$${(v/1e6).toFixed(a>=1e8?0:1)}M`:a>=1e3?`$${(v/1e3).toFixed(0)}K`:`$${Math.round(v)}`;};
+const pct=v=>`${(v*100).toFixed(1)}%`;
+
+let rows=[], LOG=[];
+const F={ledger:"rec",year:"all",region:"all",retailer:"all",product:"all",method:"all",state:null};
+const val=r=>F.ledger==="rec"?r.sr:r.sp, prof=r=>F.ledger==="rec"?r.pr:r.pp;
+
+function filtered(skip){
+  return rows.filter(r=>(skip==="year"||F.year==="all"||r.y==+F.year)&&(skip==="region"||F.region==="all"||r.region===F.region)&&
+    (skip==="retailer"||F.retailer==="all"||r.retailer===F.retailer)&&(skip==="product"||F.product==="all"||r.product===F.product)&&
+    (skip==="method"||F.method==="all"||r.method===F.method)&&(skip==="state"||!F.state||r.state===F.state));
+}
+
+/* ---------- tooltip */
+const tip=document.getElementById("tip");
+function showTip(e,h){tip.innerHTML=h;tip.style.opacity=1;tip.style.left=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8)+"px";tip.style.top=(e.clientY+14)+"px";}
+function hideTip(){tip.style.opacity=0;}
+function clickable(sel,fn,label){sel.attr("class","hit").attr("tabindex",0).attr("role","button").attr("aria-label",label).on("click",fn)
+  .on("keydown",(e,d)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();fn(e,d);}});}
+
+/* ---------- controls */
+const SELS={year:"f-year",region:"f-region",retailer:"f-retailer",product:"f-product",method:"f-method"};
+function initControls(){
+  const opts={year:[...new Set(rows.map(r=>r.y))].sort(),region:[...new Set(rows.map(r=>r.region))].sort(),retailer:[...new Set(rows.map(r=>r.retailer))].sort(),
+    product:[...new Set(rows.map(r=>r.product))].sort(),method:METHODS};
+  for(const [k,id] of Object.entries(SELS)){const s=document.getElementById(id);
+    s.innerHTML=`<option value="all">All</option>`+opts[k].map(v=>`<option value="${v}">${v}</option>`).join("");
+    s.onchange=()=>{F[k]=s.value;render();};}
+  document.querySelectorAll(".switch button").forEach(b=>b.onclick=()=>{F.ledger=b.dataset.l;render();});
+}
+function sync(){
+  for(const [k,id] of Object.entries(SELS)) document.getElementById(id).value=F[k];
+  document.querySelectorAll(".switch button").forEach(b=>b.setAttribute("aria-pressed",String(F.ledger===b.dataset.l)));
+  const c=document.getElementById("chips"); c.innerHTML="";
+  if(F.state){const b=document.createElement("button");b.className="chip";b.type="button";b.textContent=`State: ${F.state}`;b.onclick=()=>{F.state=null;render();};c.appendChild(b);}
+  if(Object.entries(F).some(([k,v])=>k!=="ledger"&&v!==null&&v!=="all")){const r=document.createElement("button");r.className="reset";r.type="button";r.textContent="Reset filters";
+    r.onclick=()=>{Object.assign(F,{year:"all",region:"all",retailer:"all",product:"all",method:"all",state:null});render();};c.appendChild(r);}
+}
+
+/* ---------- KPIs */
+function renderKPIs(R){
+  const rev=d3.sum(R,val), pr=d3.sum(R,prof), units=d3.sum(R,r=>r.u), x10=R.filter(r=>r.x10).length;
+  const other=F.ledger==="rec"?d3.sum(R,r=>r.sp):d3.sum(R,r=>r.sr);
+  const K=[
+    ["Revenue",money(rev),F.ledger==="rec"?`${money(other)} as reported`:`${money(other)} recomputed`],
+    ["Operating profit",money(pr),`margin ${rev?pct(pr/rev):"–"}`],
+    ["Units sold",d3.format(",")(units),`${d3.format(",")(R.length)} invoice lines`],
+    ["Avg price / unit",`$${(d3.sum(R,r=>r.p*r.u)/(units||1)).toFixed(2)}`,"weighted by units"],
+    ["Lines inflated 10×",d3.format(",")(x10),`<span class="flagicon">10×</span>${R.length?pct(x10/R.length):"–"} of lines`]];
+  document.getElementById("kpis").innerHTML=K.map(([k,v,s])=>`<div class="kpi"><div class="k">${k}</div><div class="v num">${v}</div><div class="s">${s}</div></div>`).join("");
+}
+
+/* ---------- 01 flip (slope chart, ignores ledger switch: always shows both) */
+function renderFlip(R){
+  const host=document.getElementById("flip"); host.innerHTML="";
+  const W=Math.max(host.clientWidth,300), H=260, m={t:28,r:120,b:16,l:120};
+  const share=(f)=>{const t=d3.sum(R,f);return METHODS.map(k=>({k,v:t?d3.sum(R.filter(r=>r.method===k),f)/t:0}));};
+  const a=share(r=>r.sp), b=share(r=>r.sr);
+  const ext=d3.extent([...a,...b],d=>d.v); const y=d3.scaleLinear().domain([Math.max(0,ext[0]-.04),Math.min(1,ext[1]+.04)]).range([H-m.b,m.t]);
+  const svg=d3.select(host).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("width",W).attr("height",H).attr("role","img").attr("aria-label","Channel share before and after correction");
+  const x0=m.l, x1=W-m.r;
+  [[x0,"As reported"],[x1,"Recomputed"]].forEach(([x,t])=>{svg.append("line").attr("x1",x).attr("x2",x).attr("y1",m.t-6).attr("y2",H-m.b).attr("stroke",css("--axis"));
+    svg.append("text").attr("x",x).attr("y",12).attr("text-anchor","middle").style("font-family","var(--mono)").style("font-size","10.5px").style("fill",css("--muted")).text(t.toUpperCase());});
+  const col=SC();
+  METHODS.forEach((k,i)=>{const va=a[i].v, vb=b[i].v;
+    svg.append("line").attr("x1",x0).attr("x2",x1).attr("y1",y(va)).attr("y2",y(vb)).attr("stroke",col[k]).attr("stroke-width",2.5);
+    [[x0,va,"end",-10],[x1,vb,"start",10]].forEach(([x,v,anc,dx])=>{
+      svg.append("circle").attr("cx",x).attr("cy",y(v)).attr("r",6).attr("fill",col[k]).attr("stroke",css("--sheet")).attr("stroke-width",2);
+      svg.append("text").attr("x",x+dx).attr("y",y(v)).attr("dy",".35em").attr("text-anchor",anc).style("fill",css("--ink")).style("font-size","12.5px")
+        .html(`${anc==="end"?`${k} `:""}<tspan style="font-family:var(--mono);font-weight:600">${pct(v)}</tspan>${anc==="start"?` ${k}`:""}`);});
+  });
+}
+
+/* ---------- 02 trend */
+function renderTrend(){
+  const R=filtered("year"); const host=document.getElementById("trend"); host.innerHTML="";
+  const W=Math.max(host.clientWidth,300), H=240, m={t:14,r:16,b:26,l:56};
+  const months=d3.timeMonths(new Date(2020,0,1),new Date(2022,0,1));
+  const byM=d3.rollup(R,v=>({rec:d3.sum(v,r=>r.sr),rep:d3.sum(v,r=>r.sp)}),r=>r.m);
+  const data=months.map(d=>{const k=d3.timeFormat("%Y-%m")(d);const o=byM.get(k)||{rec:0,rep:0};return{d,...o};});
+  const x=d3.scaleTime().domain([months[0],months[months.length-1]]).range([m.l,W-m.r]);
+  const y=d3.scaleLinear().domain([0,d3.max(data,d=>Math.max(d[F.ledger],1))]).nice().range([H-m.b,m.t]);
+  const svg=d3.select(host).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("width",W).attr("height",H);
+  svg.append("rect").attr("class","warnband").attr("x",x(months[0])).attr("y",m.t).attr("width",x(new Date(2021,0,1))-x(months[0])).attr("height",H-m.t-m.b);
+  svg.append("text").attr("x",x(months[0])+8).attr("y",m.t+14).style("font-family","var(--mono)").style("font-size","10px").style("fill",css("--flag-ink")).text("2020 · 9 CITIES ONLY");
+  svg.append("g").attr("class","grid-line").attr("transform",`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W-m.l-m.r)).tickFormat(""));
+  svg.append("g").attr("class","axis").attr("transform",`translate(0,${H-m.b})`).call(d3.axisBottom(x).ticks(W<500?3:8).tickFormat(d3.timeFormat(W<500?"%b '%y":"%b %y")).tickSizeOuter(0));
+  svg.append("g").attr("class","axis").attr("transform",`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickFormat(money)).call(g=>g.select(".domain").remove());
+  const other=F.ledger==="rec"?"rep":"rec";
+  const line=k=>d3.line().x(d=>x(d.d)).y(d=>y(d[k])).curve(d3.curveMonotoneX);
+  const ymaxOther=d3.max(data,d=>d[other]);
+  if(ymaxOther<=y.domain()[1]*1.05) svg.append("path").datum(data).attr("fill","none").attr("stroke",css("--muted")).attr("stroke-width",1.5).attr("stroke-dasharray","4 4").attr("d",line(other));
+  const area=d3.area().x(d=>x(d.d)).y0(H-m.b).y1(d=>y(d[F.ledger])).curve(d3.curveMonotoneX);
+  svg.append("path").datum(data).attr("fill",css("--s1")).attr("opacity",.12).attr("d",area);
+  svg.append("path").datum(data).attr("fill","none").attr("stroke",css("--s1")).attr("stroke-width",2).attr("d",line(F.ledger));
+  const last=data[data.length-1]; svg.append("circle").attr("cx",x(last.d)).attr("cy",y(last[F.ledger])).attr("r",4).attr("fill",css("--s1"));
+  document.getElementById("trend-legend").innerHTML=`<span><i style="background:${css("--s1")}"></i>${F.ledger==="rec"?"Recomputed":"As reported"}</span>`+
+    (ymaxOther<=y.domain()[1]*1.05?`<span><i style="background:none;border-top:2px dashed ${css("--muted")};height:0;width:14px;vertical-align:3px"></i>${F.ledger==="rec"?"As reported":"Recomputed"}</span>`:`<span style="color:var(--muted)">As reported runs off this scale</span>`);
+  const cross=svg.append("line").attr("y1",m.t).attr("y2",H-m.b).attr("stroke",css("--muted")).attr("stroke-dasharray","3 3").style("opacity",0);
+  svg.append("rect").attr("x",m.l).attr("y",m.t).attr("width",W-m.l-m.r).attr("height",H-m.t-m.b).attr("fill","transparent")
+    .on("mousemove",e=>{const [mx]=d3.pointer(e);const d=data[d3.bisector(d=>d.d).center(data,x.invert(mx))];cross.attr("x1",x(d.d)).attr("x2",x(d.d)).style("opacity",1);
+      showTip(e,`<b>${d3.timeFormat("%B %Y")(d.d)}</b><br>Recomputed ${money(d.rec)}<br>As reported ${money(d.rep)}`);})
+    .on("mouseleave",()=>{cross.style("opacity",0);hideTip();});
+}
+
+/* ---------- horizontal bars helper */
+function hbars(hostId,data,opts){
+  const host=document.getElementById(hostId); host.innerHTML="";
+  if(!data.length){host.innerHTML='<p class="sub">No rows match.</p>';return;}
+  const W=Math.max(host.clientWidth,260), rowH=34, lw=opts.lw||96, H=data.length*rowH;
+  const x=d3.scaleLinear().domain([0,d3.max(data,d=>d.v)||1]).range([0,W-lw-(opts.rw||70)]);
+  const svg=d3.select(host).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("width",W).attr("height",H);
+  const g=svg.selectAll("g").data(data).join("g").attr("transform",(d,i)=>`translate(0,${i*rowH})`);
+  g.append("rect").attr("width",W).attr("height",rowH).attr("fill","transparent");
+  g.append("text").attr("x",lw-10).attr("y",rowH/2).attr("dy",".35em").attr("text-anchor","end").style("fill",css("--ink")).style("font-size","12.5px").style("font-weight",d=>d.on?700:400).text(d=>d.k);
+  g.append("rect").attr("x",lw).attr("y",8).attr("height",rowH-16).attr("rx",3).attr("width",d=>Math.max(3,x(d.v))).attr("fill",d=>opts.color(d)).style("opacity",d=>d.dim?.3:1);
+  g.append("text").attr("x",d=>lw+Math.max(3,x(d.v))+8).attr("y",rowH/2).attr("dy",".35em").style("font-family","var(--mono)").style("font-size","11px").style("fill",css("--ink-2")).text(opts.label);
+  clickable(g,(e,d)=>{opts.click(d);hideTip();render();},"Filter");
+  g.on("mousemove",(e,d)=>showTip(e,opts.tip(d))).on("mouseleave",hideTip);
+}
+
+function renderMethod(){
+  const R=filtered("method"); const t=d3.sum(R,val), col=SC();
+  const data=METHODS.map(k=>{const s=R.filter(r=>r.method===k);return{k,v:d3.sum(s,val),on:F.method===k,dim:F.method!=="all"&&F.method!==k};});
+  hbars("method",data,{lw:76,rw:124,color:d=>col[d.k],label:d=>`${money(d.v)} · ${t?pct(d.v/t):"–"}`,click:d=>{F.method=F.method===d.k?"all":d.k;},
+    tip:d=>`<b>${d.k}</b><br>${money(d.v)} (${t?pct(d.v/t):"–"})<br>Click to ${d.on?"clear":"filter"}`});
+}
+function renderRetailer(){
+  const R=filtered("retailer");
+  const data=d3.rollups(R,v=>({v:d3.sum(v,val),p:d3.sum(v,prof)}),r=>r.retailer).map(([k,o])=>({k,v:o.v,mg:o.v?o.p/o.v:0,on:F.retailer===k,dim:F.retailer!=="all"&&F.retailer!==k})).sort((a,b)=>b.v-a.v);
+  hbars("retailer",data,{lw:104,rw:136,color:()=>css("--s1"),label:d=>`${money(d.v)} · ${pct(d.mg)} mgn`,click:d=>{F.retailer=F.retailer===d.k?"all":d.k;},
+    tip:d=>`<b>${d.k}</b><br>Revenue ${money(d.v)}<br>Operating margin ${pct(d.mg)}`});
+}
+
+/* ---------- 04 tile map */
+const inkOn=c=>d3.lab(c).l>62?"#0b0b0b":"#ffffff";
+function seqColor(t){const s=["--seq-0","--seq-1","--seq-2","--seq-3","--seq-4","--seq-5"].map(css);return d3.interpolateRgbBasis(s)(t);}
+function renderMap(){
+  const R=filtered("state"); const host=document.getElementById("map"); host.innerHTML="";
+  const by=d3.rollup(R,v=>d3.sum(v,val),r=>r.state); const max=d3.max([...by.values()])||1;
+  const W=Math.max(host.clientWidth,300), cols=11, gap=4, s=Math.min(54,(W-gap*(cols-1))/cols), H=8*(s+gap);
+  const svg=d3.select(host).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("width",W).attr("height",H);
+  const ox=(W-(cols*s+(cols-1)*gap))/2;
+  Object.entries(ABBR).forEach(([name,ab])=>{const [c,r]=TILE[ab]; const v=by.get(name)||0;
+    const g=svg.append("g").attr("transform",`translate(${ox+c*(s+gap)},${r*(s+gap)})`).style("opacity",F.state&&F.state!==name?.35:1);
+    g.append("rect").attr("width",s).attr("height",s).attr("rx",6).attr("fill",v?seqColor(Math.sqrt(v/max)):css("--paper")).attr("stroke",F.state===name?css("--ink"):css("--rule")).attr("stroke-width",F.state===name?2:1);
+    const fill=v?seqColor(Math.sqrt(v/max)):css("--paper");
+    g.append("text").attr("x",s/2).attr("y",s/2).attr("dy",".35em").attr("text-anchor","middle").style("font-weight",700).style("font-size",s<36?"10px":"12px")
+      .style("fill",v?inkOn(fill):css("--muted")).text(ab);
+    clickable(g,()=>{F.state=F.state===name?null:name;hideTip();render();},`Filter to ${name}`);
+    g.on("mousemove",e=>showTip(e,`<b>${name}</b><br>${money(v)}`)).on("mouseleave",hideTip);
+  });
+  document.getElementById("map-legend").innerHTML=`<span style="display:flex;align-items:center;gap:6px">$0 <i style="width:80px;height:8px;border-radius:2px;background:linear-gradient(90deg,${[0,.2,.4,.6,.8,1].map(seqColor).join(",")})"></i> ${money(max)}</span>`;
+}
+
+/* ---------- 06 heatmap */
+function renderHeat(){
+  const R=rows.filter(r=>(F.year==="all"||r.y==+F.year)&&(F.retailer==="all"||r.retailer===F.retailer)&&(F.method==="all"||r.method===F.method)&&(!F.state||r.state===F.state));
+  const host=document.getElementById("heat"); host.innerHTML="";
+  const prods=[...new Set(rows.map(r=>r.product))].sort(), regs=[...new Set(rows.map(r=>r.region))].sort();
+  const by=d3.rollup(R,v=>d3.sum(v,val),r=>r.product,r=>r.region); let max=0; by.forEach(m=>m.forEach(v=>max=Math.max(max,v)));
+  const W=Math.max(host.clientWidth,300), lw=W<520?120:170, top=24, ch=34, cw=(W-lw)/regs.length, H=top+prods.length*ch;
+  const svg=d3.select(host).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("width",W).attr("height",H);
+  regs.forEach((rg,j)=>svg.append("text").attr("x",lw+j*cw+cw/2).attr("y",14).attr("text-anchor","middle").style("font-family","var(--mono)").style("font-size","10px").style("fill",css("--muted")).text(rg.toUpperCase()));
+  prods.forEach((p,i)=>{
+    svg.append("text").attr("x",lw-10).attr("y",top+i*ch+ch/2).attr("dy",".35em").attr("text-anchor","end").style("fill",css("--ink")).style("font-size","12px").style("font-weight",F.product===p?700:400).text(p);
+    regs.forEach((rg,j)=>{const v=(by.get(p)&&by.get(p).get(rg))||0, t=max?Math.sqrt(v/max):0, on=(F.product==="all"||F.product===p)&&(F.region==="all"||F.region===rg);
+      const g=svg.append("g").attr("transform",`translate(${lw+j*cw},${top+i*ch})`).style("opacity",on?1:.3);
+      g.append("rect").attr("x",1).attr("y",1).attr("width",cw-2).attr("height",ch-2).attr("rx",4).attr("fill",seqColor(t));
+      g.append("text").attr("x",cw/2).attr("y",ch/2).attr("dy",".35em").attr("text-anchor","middle").style("font-family","var(--mono)").style("font-size","10.5px").style("fill",inkOn(seqColor(t))).text(money(v));
+      clickable(g,()=>{const same=F.product===p&&F.region===rg;F.product=same?"all":p;F.region=same?"all":rg;hideTip();render();},`Filter to ${p} in ${rg}`);
+      g.on("mousemove",e=>showTip(e,`<b>${p}</b> · ${rg}<br>${money(v)}`)).on("mouseleave",hideTip);});
+  });
+}
+
+/* ---------- 07 two populations (strip/histogram) */
+function renderPop(R){
+  const host=document.getElementById("pop"); host.innerHTML="";
+  const W=Math.max(host.clientWidth,260), H=230, m={t:10,r:12,b:30,l:40};
+  const x=d3.scaleLinear().domain([0,1300]).range([m.l,W-m.r]);
+  const bins=d3.bin().domain(x.domain()).thresholds(26);
+  const a=bins(R.filter(r=>!r.x10).map(r=>r.u)), b=bins(R.filter(r=>r.x10).map(r=>r.u));
+  const y=d3.scaleLinear().domain([0,d3.max([...a,...b],d=>d.length)||1]).nice().range([H-m.b,m.t]);
+  const svg=d3.select(host).append("svg").attr("viewBox",`0 0 ${W} ${H}`).attr("width",W).attr("height",H);
+  svg.append("g").attr("class","grid-line").attr("transform",`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4).tickSize(-(W-m.l-m.r)).tickFormat(""));
+  svg.append("g").attr("class","axis").attr("transform",`translate(0,${H-m.b})`).call(d3.axisBottom(x).ticks(5).tickSizeOuter(0));
+  svg.append("g").attr("class","axis").attr("transform",`translate(${m.l},0)`).call(d3.axisLeft(y).ticks(4)).call(g=>g.select(".domain").remove());
+  const draw=(bs,c,o)=>svg.append("g").selectAll("rect").data(bs).join("rect").attr("x",d=>x(d.x0)+1).attr("width",d=>Math.max(0,x(d.x1)-x(d.x0)-2)).attr("y",d=>y(d.length)).attr("height",d=>y(0)-y(d.length)).attr("fill",c).attr("opacity",o).attr("rx",2)
+    .on("mousemove",(e,d)=>showTip(e,`${d.x0}–${d.x1} units<br>${d.length} lines`)).on("mouseleave",hideTip);
+  draw(a,css("--s1"),.85); draw(b,css("--flag"),.85);
+  const ma=d3.median(R.filter(r=>!r.x10),r=>r.u), mb=d3.median(R.filter(r=>r.x10),r=>r.u);
+  svg.append("text").attr("x",W-m.r).attr("y",m.t+12).attr("text-anchor","end").style("font-size","11.5px").style("fill",css("--ink"))
+    .text(`median ${ma??"–"} units (normal) vs ${mb??"–"} (10×)`);
+  svg.append("text").attr("x",(m.l+W-m.r)/2).attr("y",H-2).attr("text-anchor","middle").style("font-family","var(--mono)").style("font-size","10px").style("fill",css("--muted")).text("UNITS SOLD PER LINE");
+  host.insertAdjacentHTML("afterbegin",`<div class="legend" style="margin-bottom:6px"><span><i style="background:${css("--s1")}"></i>Normal lines</span><span><i style="background:${css("--flag")}"></i><span class="flagicon" style="margin-right:6px">10×</span>Inflated lines</span></div>`);
+}
+
+function renderLog(){
+  document.getElementById("logcount").textContent=`${LOG.length} checks`;
+  document.getElementById("log").innerHTML=`<thead><tr><th>Check</th><th style="text-align:right">Rows</th><th>Finding</th><th>Action</th></tr></thead><tbody>`+
+    LOG.map(r=>`<tr><td>${r.check}</td><td class="n">${d3.format(",")(+r.rows_affected)}</td><td>${r.finding}</td><td>${r.action}</td></tr>`).join("")+"</tbody>";
+}
+
+function render(){
+  sync();
+  const R=filtered();
+  document.getElementById("tot-rec").textContent=money(d3.sum(rows,r=>r.sr));
+  document.getElementById("tot-rep").textContent=money(d3.sum(rows,r=>r.sp));
+  renderKPIs(R); renderFlip(R); renderTrend(); renderMethod(); renderMap(); renderRetailer(); renderHeat(); renderPop(R);
+}
+
+async function getText(urls){for(const [u,k] of urls){try{const r=await fetch(u,{cache:"no-store"});if(!r.ok)throw 0;const t=await r.text();if(t.length<20)throw 0;return {t,k};}catch(e){}}throw new Error("no data");}
+async function boot(){
+  const src=document.getElementById("src");
+  try{
+    const f=await getText([[RAW("sales_clean.csv"),"live"],...FALLBACKS.map(p=>[p+"sales_clean.csv","snapshot"])]);
+    const l=await getText([[RAW("data_quality_log.csv"),"live"],...FALLBACKS.map(p=>[p+"data_quality_log.csv","snapshot"])]).catch(()=>({t:"check,rows_affected,finding,action\n"}));
+    const B=v=>v==="True"||v==="true"||v==="1";
+    rows=d3.csvParse(f.t,d=>({y:+d.year,m:d.month,retailer:d.retailer,region:d.region,state:d.state,product:d.product,method:d.sales_method,
+      p:+d.price_per_unit,u:+d.units_sold,sp:+d.sales_reported,sr:+d.sales_recomputed,pp:+d.profit_reported,pr:+d.profit_recomputed,x10:B(d.flag_sales_x10)}));
+    LOG=d3.csvParse(l.t);
+    src.innerHTML=f.k==="live"?`<span class="dot live"></span>Live from <a href="https://github.com/${SOURCE.repo}" target="_blank" rel="noopener">github.com/${SOURCE.repo}</a> · ${d3.format(",")(rows.length)} lines`
+      :`<span class="dot"></span>Bundled snapshot · ${d3.format(",")(rows.length)} lines`;
+    document.getElementById("l-rep").textContent=money(d3.sum(rows,r=>r.sp)); document.getElementById("l-rec").textContent=money(d3.sum(rows,r=>r.sr));
+    document.getElementById("l-x10").textContent=Math.round(100*rows.filter(r=>r.x10).length/rows.length)+"%";
+    initControls(); renderLog(); render();
+  }catch(e){src.innerHTML=`<span class="dot" style="background:var(--crit)"></span>Couldn't load the data. Refresh to try again.`;}
+}
+boot();
+let rt; addEventListener("resize",()=>{if(!rows.length)return;clearTimeout(rt);rt=setTimeout(render,150);});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>rows.length&&render());
+new MutationObserver(()=>rows.length&&render()).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+</script>
