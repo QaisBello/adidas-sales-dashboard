@@ -49,6 +49,10 @@ docs/data-dictionary.md              every column explained
 excel/                               the original Excel dashboard (v1), kept for comparison
 ```
 
+## Power BI version
+
+The same analysis as a ready-made Power BI report, in [`powerbi/`](powerbi/): the audit page (reported vs recomputed, the channel flip, every data quality check) and a sales page where one slicer switches every figure between reported and recomputed sales. Totals and channel shares are checked against `audit_summary.json`. Open `powerbi/Adidas_Audit.pbip` in Power BI Desktop and click Refresh; it reads the cleaned data from this repo.
+
 ## Run it
 
 ```bash
