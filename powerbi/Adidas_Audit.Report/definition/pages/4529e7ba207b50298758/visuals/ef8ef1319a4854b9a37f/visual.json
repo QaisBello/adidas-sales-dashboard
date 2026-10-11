@@ -1,0 +1,113 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.4.0/schema.json",
+  "name": "ef8ef1319a4854b9a37f",
+  "position": {
+    "x": 24,
+    "y": 496,
+    "z": 12,
+    "width": 1232,
+    "height": 212,
+    "tabOrder": 12
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Quality Log"
+                    }
+                  },
+                  "Property": "check"
+                }
+              },
+              "queryRef": "Quality Log.check",
+              "nativeQueryRef": "check",
+              "displayName": "Check"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Quality Log"
+                    }
+                  },
+                  "Property": "rows_affected"
+                }
+              },
+              "queryRef": "Quality Log.rows_affected",
+              "nativeQueryRef": "rows_affected",
+              "displayName": "Rows"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Quality Log"
+                    }
+                  },
+                  "Property": "finding"
+                }
+              },
+              "queryRef": "Quality Log.finding",
+              "nativeQueryRef": "finding",
+              "displayName": "Finding"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Quality Log"
+                    }
+                  },
+                  "Property": "action"
+                }
+              },
+              "queryRef": "Quality Log.action",
+              "nativeQueryRef": "action",
+              "displayName": "Action"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Every check on the raw file'"
+                }
+              }
+            },
+            "fontSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "12D"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

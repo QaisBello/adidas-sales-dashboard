@@ -1,0 +1,26 @@
+/// Disconnected table for the slicer that switches every figure between reported and recomputed sales.
+table Basis
+
+	column Basis
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Basis
+		sortByColumn: Order
+
+	column Order
+		dataType: int64
+		isHidden
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: Order
+
+	partition Basis = m
+		mode: import
+		source = ```
+				let
+				    Source = Table.FromRecords({[Basis = "Recomputed (price x units)", Order = 1], [Basis = "As reported", Order = 2]}),
+				    Result = Table.TransformColumnTypes(Source, {{"Basis", type text}, {"Order", Int64.Type}})
+				in
+				    Result
+				```
+

@@ -1,0 +1,247 @@
+/// One row per invoice line (9,648), with the reported and the recomputed (price x units) sales and profit, and audit flags.
+table Sales
+
+	/// The basis chosen in the slicer; recomputed when nothing is chosen.
+	measure 'Selected Basis' = SELECTEDVALUE ( Basis[Basis], "Recomputed (price x units)" )
+		formatString: General
+		displayFolder: Switch
+
+	/// Total sales as published in the dataset.
+	measure 'Sales Reported' = SUM ( Sales[sales_reported] )
+		formatString: \$#,0
+		displayFolder: Sales
+
+	/// Price x units for every line.
+	measure 'Sales Recomputed' = SUM ( Sales[sales_recomputed] )
+		formatString: \$#,0
+		displayFolder: Sales
+
+	/// Sales on the basis chosen in the slicer.
+	measure 'Total Sales' = IF ( [Selected Basis] = "As reported", [Sales Reported], [Sales Recomputed] )
+		formatString: \$#,0
+		displayFolder: Sales
+
+	/// Operating profit on the chosen basis (profit follows the inflated sales column).
+	measure 'Operating Profit' = IF ( [Selected Basis] = "As reported", SUM ( Sales[profit_reported] ), SUM ( Sales[profit_recomputed] ) )
+		formatString: \$#,0
+		displayFolder: Sales
+
+	/// Units sold.
+	measure 'Units Sold' = SUM ( Sales[units_sold] )
+		formatString: #,0
+		displayFolder: Sales
+
+	/// Reported sales as a multiple of the recomputed figure.
+	measure Overstatement = DIVIDE ( [Sales Reported], [Sales Recomputed] )
+		formatString: 0.0"x"
+		displayFolder: Audit
+
+	/// Invoice lines.
+	measure Lines = COUNTROWS ( Sales )
+		formatString: #,0
+		displayFolder: Audit
+
+	/// Lines whose reported sales are exactly 10 x price x units.
+	measure 'Lines Inflated 10x' = CALCULATE ( [Lines], Sales[flag_sales_x10] == TRUE () )
+		formatString: #,0
+		displayFolder: Audit
+
+	/// Share of lines carrying the 10x error.
+	measure 'Share of Lines Inflated' = DIVIDE ( [Lines Inflated 10x], [Lines] )
+		formatString: 0.0%
+		displayFolder: Audit
+
+	/// Share of sales by channel on the chosen basis.
+	measure 'Channel Share' = DIVIDE ( [Total Sales], CALCULATE ( [Total Sales], REMOVEFILTERS ( Sales[sales_method] ) ) )
+		formatString: 0.0%
+		displayFolder: Channels
+
+	/// Channel share as reported.
+	measure 'Channel Share Reported' = DIVIDE ( [Sales Reported], CALCULATE ( [Sales Reported], REMOVEFILTERS ( Sales[sales_method] ) ) )
+		formatString: 0.0%
+		displayFolder: Channels
+
+	/// Channel share recomputed.
+	measure 'Channel Share Recomputed' = DIVIDE ( [Sales Recomputed], CALCULATE ( [Sales Recomputed], REMOVEFILTERS ( Sales[sales_method] ) ) )
+		formatString: 0.0%
+		displayFolder: Channels
+
+	/// Cities with sales: 9 in 2020 against 47 in 2021, which is why year-on-year growth is not like-for-like.
+	measure 'Cities Selling' = DISTINCTCOUNT ( Sales[city_state] )
+		formatString: #,0
+		displayFolder: Coverage
+
+	column invoice_date
+		dataType: dateTime
+		formatString: dd mmm yyyy
+		summarizeBy: none
+		sourceColumn: invoice_date
+
+	column year
+		dataType: int64
+		formatString: 0
+		summarizeBy: none
+		sourceColumn: year
+
+	column month
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: month
+
+	column retailer
+		dataType: string
+		summarizeBy: none
+		sourceColumn: retailer
+
+	column region
+		dataType: string
+		summarizeBy: none
+		sourceColumn: region
+
+	column state
+		dataType: string
+		summarizeBy: none
+		sourceColumn: state
+
+	column city
+		dataType: string
+		summarizeBy: none
+		sourceColumn: city
+
+	column city_state
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: city_state
+
+	column product
+		dataType: string
+		summarizeBy: none
+		sourceColumn: product
+
+	column sales_method
+		dataType: string
+		summarizeBy: none
+		sourceColumn: sales_method
+
+	column price_per_unit
+		dataType: decimal
+		formatString: #,0.00
+		summarizeBy: none
+		sourceColumn: price_per_unit
+
+	column units_sold
+		dataType: int64
+		formatString: #,0
+		summarizeBy: none
+		sourceColumn: units_sold
+
+	column operating_margin
+		dataType: double
+		formatString: 0%
+		summarizeBy: none
+		sourceColumn: operating_margin
+
+	column sales_reported
+		dataType: decimal
+		isHidden
+		formatString: #,0.00
+		summarizeBy: none
+		sourceColumn: sales_reported
+
+	column sales_recomputed
+		dataType: decimal
+		isHidden
+		formatString: #,0.00
+		summarizeBy: none
+		sourceColumn: sales_recomputed
+
+	column profit_reported
+		dataType: decimal
+		isHidden
+		formatString: #,0.00
+		summarizeBy: none
+		sourceColumn: profit_reported
+
+	column profit_recomputed
+		dataType: decimal
+		isHidden
+		formatString: #,0.00
+		summarizeBy: none
+		sourceColumn: profit_recomputed
+
+	column flag_sales_x10
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: flag_sales_x10
+
+	column flag_same_day_pair
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: flag_same_day_pair
+
+	column flag_zero_units
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: flag_zero_units
+
+	column like_for_like
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: like_for_like
+
+	column 'Month Start'
+		dataType: dateTime
+		formatString: mmm yyyy
+		summarizeBy: none
+		sourceColumn: Month Start
+
+	partition Sales = m
+		mode: import
+		source = ```
+				let
+				    Source = Csv.Document(
+				        Web.Contents(BaseUrl, [RelativePath = "sales_clean.csv"]),
+				        [Delimiter = ",", Encoding = 65001, QuoteStyle = QuoteStyle.Csv]
+				    ),
+				    #"Promoted Headers" = Table.PromoteHeaders(Source, [PromoteAllScalars = true]),
+				    // empty cells and R's NA arrive as text and would fail the type change: make them null
+				    #"Blanks to Null" = Table.TransformColumns(#"Promoted Headers", {}, each if _ = "" or _ = "NA" then null else _),
+				    // True/TRUE/true all become true: pandas writes True, R writes TRUE
+				    #"Booleans" = Table.TransformColumns(#"Blanks to Null", {{"flag_sales_x10", each if _ = null then null else Text.Lower(_)}, {"flag_same_day_pair", each if _ = null then null else Text.Lower(_)}, {"flag_zero_units", each if _ = null then null else Text.Lower(_)}, {"like_for_like", each if _ = null then null else Text.Lower(_)}}),
+				    #"Changed Types" = Table.TransformColumnTypes(
+				        #"Booleans",
+				        {
+				            {"invoice_date", type datetime},
+				            {"year", Int64.Type},
+				            {"month", type text},
+				            {"retailer", type text},
+				            {"region", type text},
+				            {"state", type text},
+				            {"city", type text},
+				            {"city_state", type text},
+				            {"product", type text},
+				            {"sales_method", type text},
+				            {"price_per_unit", Currency.Type},
+				            {"units_sold", Int64.Type},
+				            {"operating_margin", type number},
+				            {"sales_reported", Currency.Type},
+				            {"sales_recomputed", Currency.Type},
+				            {"profit_reported", Currency.Type},
+				            {"profit_recomputed", Currency.Type},
+				            {"flag_sales_x10", type logical},
+				            {"flag_same_day_pair", type logical},
+				            {"flag_zero_units", type logical},
+				            {"like_for_like", type logical}
+				        },
+				        "en-US"
+				    ),
+				    #"Filtered Rows" = #"Changed Types",
+				    #"Month Start" = Table.AddColumn(#"Filtered Rows", "Month Start", each #datetime(
+				        Number.FromText(Text.Start([month], 4)), Number.FromText(Text.End([month], 2)), 1, 0, 0, 0), type datetime),
+				    Result = #"Month Start"
+				in
+				    Result
+				```
+

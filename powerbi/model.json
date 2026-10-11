@@ -1,0 +1,451 @@
+{
+  "tables": [
+    {
+      "name": "Sales",
+      "description": "One row per invoice line (9,648), with the reported and the recomputed (price x units) sales and profit, and audit flags.",
+      "columns": [
+        {
+          "name": "invoice_date",
+          "type": "dateTime",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "year",
+          "type": "int64",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "month",
+          "type": "string",
+          "hidden": true,
+          "key": false
+        },
+        {
+          "name": "retailer",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "region",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "state",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "city",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "city_state",
+          "type": "string",
+          "hidden": true,
+          "key": false
+        },
+        {
+          "name": "product",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "sales_method",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "price_per_unit",
+          "type": "decimal",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "units_sold",
+          "type": "int64",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "operating_margin",
+          "type": "double",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "sales_reported",
+          "type": "decimal",
+          "hidden": true,
+          "key": false
+        },
+        {
+          "name": "sales_recomputed",
+          "type": "decimal",
+          "hidden": true,
+          "key": false
+        },
+        {
+          "name": "profit_reported",
+          "type": "decimal",
+          "hidden": true,
+          "key": false
+        },
+        {
+          "name": "profit_recomputed",
+          "type": "decimal",
+          "hidden": true,
+          "key": false
+        },
+        {
+          "name": "flag_sales_x10",
+          "type": "boolean",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "flag_same_day_pair",
+          "type": "boolean",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "flag_zero_units",
+          "type": "boolean",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "like_for_like",
+          "type": "boolean",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "Month Start",
+          "type": "dateTime",
+          "hidden": false,
+          "key": false
+        }
+      ]
+    },
+    {
+      "name": "Basis",
+      "description": "Disconnected table for the slicer that switches every figure between reported and recomputed sales.",
+      "columns": [
+        {
+          "name": "Basis",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "Order",
+          "type": "int64",
+          "hidden": true,
+          "key": false
+        }
+      ]
+    },
+    {
+      "name": "Quality Log",
+      "description": "Every check run on the raw file, with the rows affected and the action taken.",
+      "columns": [
+        {
+          "name": "check",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "rows_affected",
+          "type": "int64",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "finding",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        },
+        {
+          "name": "action",
+          "type": "string",
+          "hidden": false,
+          "key": false
+        }
+      ]
+    }
+  ],
+  "relationships": [],
+  "measures": [
+    {
+      "name": "Selected Basis",
+      "table": "Sales",
+      "folder": "Switch",
+      "format": "General",
+      "dax": "SELECTEDVALUE ( Basis[Basis], \"Recomputed (price x units)\" )",
+      "description": "The basis chosen in the slicer; recomputed when nothing is chosen."
+    },
+    {
+      "name": "Sales Reported",
+      "table": "Sales",
+      "folder": "Sales",
+      "format": "\\$#,0",
+      "dax": "SUM ( Sales[sales_reported] )",
+      "description": "Total sales as published in the dataset."
+    },
+    {
+      "name": "Sales Recomputed",
+      "table": "Sales",
+      "folder": "Sales",
+      "format": "\\$#,0",
+      "dax": "SUM ( Sales[sales_recomputed] )",
+      "description": "Price x units for every line."
+    },
+    {
+      "name": "Total Sales",
+      "table": "Sales",
+      "folder": "Sales",
+      "format": "\\$#,0",
+      "dax": "IF ( [Selected Basis] = \"As reported\", [Sales Reported], [Sales Recomputed] )",
+      "description": "Sales on the basis chosen in the slicer."
+    },
+    {
+      "name": "Operating Profit",
+      "table": "Sales",
+      "folder": "Sales",
+      "format": "\\$#,0",
+      "dax": "IF ( [Selected Basis] = \"As reported\", SUM ( Sales[profit_reported] ), SUM ( Sales[profit_recomputed] ) )",
+      "description": "Operating profit on the chosen basis (profit follows the inflated sales column)."
+    },
+    {
+      "name": "Units Sold",
+      "table": "Sales",
+      "folder": "Sales",
+      "format": "#,0",
+      "dax": "SUM ( Sales[units_sold] )",
+      "description": "Units sold."
+    },
+    {
+      "name": "Overstatement",
+      "table": "Sales",
+      "folder": "Audit",
+      "format": "0.0\"x\"",
+      "dax": "DIVIDE ( [Sales Reported], [Sales Recomputed] )",
+      "description": "Reported sales as a multiple of the recomputed figure."
+    },
+    {
+      "name": "Lines",
+      "table": "Sales",
+      "folder": "Audit",
+      "format": "#,0",
+      "dax": "COUNTROWS ( Sales )",
+      "description": "Invoice lines."
+    },
+    {
+      "name": "Lines Inflated 10x",
+      "table": "Sales",
+      "folder": "Audit",
+      "format": "#,0",
+      "dax": "CALCULATE ( [Lines], Sales[flag_sales_x10] == TRUE () )",
+      "description": "Lines whose reported sales are exactly 10 x price x units."
+    },
+    {
+      "name": "Share of Lines Inflated",
+      "table": "Sales",
+      "folder": "Audit",
+      "format": "0.0%",
+      "dax": "DIVIDE ( [Lines Inflated 10x], [Lines] )",
+      "description": "Share of lines carrying the 10x error."
+    },
+    {
+      "name": "Channel Share",
+      "table": "Sales",
+      "folder": "Channels",
+      "format": "0.0%",
+      "dax": "DIVIDE ( [Total Sales], CALCULATE ( [Total Sales], REMOVEFILTERS ( Sales[sales_method] ) ) )",
+      "description": "Share of sales by channel on the chosen basis."
+    },
+    {
+      "name": "Channel Share Reported",
+      "table": "Sales",
+      "folder": "Channels",
+      "format": "0.0%",
+      "dax": "DIVIDE ( [Sales Reported], CALCULATE ( [Sales Reported], REMOVEFILTERS ( Sales[sales_method] ) ) )",
+      "description": "Channel share as reported."
+    },
+    {
+      "name": "Channel Share Recomputed",
+      "table": "Sales",
+      "folder": "Channels",
+      "format": "0.0%",
+      "dax": "DIVIDE ( [Sales Recomputed], CALCULATE ( [Sales Recomputed], REMOVEFILTERS ( Sales[sales_method] ) ) )",
+      "description": "Channel share recomputed."
+    },
+    {
+      "name": "Cities Selling",
+      "table": "Sales",
+      "folder": "Coverage",
+      "format": "#,0",
+      "dax": "DISTINCTCOUNT ( Sales[city_state] )",
+      "description": "Cities with sales: 9 in 2020 against 47 in 2021, which is why year-on-year growth is not like-for-like."
+    }
+  ],
+  "pages": [
+    {
+      "page": "The audit",
+      "visuals": [
+        {
+          "type": "textbox",
+          "x": 24,
+          "y": 12,
+          "width": 1232,
+          "height": 52
+        },
+        {
+          "type": "card",
+          "x": 24,
+          "y": 76,
+          "width": 300,
+          "height": 96
+        },
+        {
+          "type": "card",
+          "x": 336,
+          "y": 76,
+          "width": 300,
+          "height": 96
+        },
+        {
+          "type": "card",
+          "x": 648,
+          "y": 76,
+          "width": 300,
+          "height": 96
+        },
+        {
+          "type": "card",
+          "x": 960,
+          "y": 76,
+          "width": 296,
+          "height": 96
+        },
+        {
+          "type": "clusteredColumnChart",
+          "x": 24,
+          "y": 184,
+          "width": 560,
+          "height": 300
+        },
+        {
+          "type": "lineChart",
+          "x": 600,
+          "y": 184,
+          "width": 656,
+          "height": 300
+        },
+        {
+          "type": "tableEx",
+          "x": 24,
+          "y": 496,
+          "width": 1232,
+          "height": 212
+        }
+      ]
+    },
+    {
+      "page": "Sales",
+      "visuals": [
+        {
+          "type": "textbox",
+          "x": 24,
+          "y": 12,
+          "width": 700,
+          "height": 52
+        },
+        {
+          "type": "slicer",
+          "x": 736,
+          "y": 8,
+          "width": 260,
+          "height": 64
+        },
+        {
+          "type": "slicer",
+          "x": 1008,
+          "y": 8,
+          "width": 248,
+          "height": 64
+        },
+        {
+          "type": "card",
+          "x": 24,
+          "y": 76,
+          "width": 300,
+          "height": 96
+        },
+        {
+          "type": "card",
+          "x": 336,
+          "y": 76,
+          "width": 300,
+          "height": 96
+        },
+        {
+          "type": "card",
+          "x": 648,
+          "y": 76,
+          "width": 300,
+          "height": 96
+        },
+        {
+          "type": "card",
+          "x": 960,
+          "y": 76,
+          "width": 296,
+          "height": 96
+        },
+        {
+          "type": "clusteredBarChart",
+          "x": 24,
+          "y": 184,
+          "width": 400,
+          "height": 260
+        },
+        {
+          "type": "clusteredBarChart",
+          "x": 440,
+          "y": 184,
+          "width": 400,
+          "height": 260
+        },
+        {
+          "type": "clusteredBarChart",
+          "x": 856,
+          "y": 184,
+          "width": 400,
+          "height": 524
+        },
+        {
+          "type": "pivotTable",
+          "x": 24,
+          "y": 456,
+          "width": 816,
+          "height": 252
+        }
+      ]
+    }
+  ],
+  "base_url": "https://raw.githubusercontent.com/QaisBello/adidas-sales-dashboard/main/data/cleaned/"
+}
